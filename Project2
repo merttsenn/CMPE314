@@ -1,0 +1,91 @@
+;Mert Şen
+;111200029
+;Dr.Racket project 2
+;This project includes works from both project one and 2.
+;It does basic calculation and parsing. 
+
+#lang plai-typed
+
+;Defining datatypes
+(define-type msl
+  [msl-num (n : number)]
+  [msl-add (lhs : msl) (rhs : msl)]
+  [msl-mult (lhs : msl) (rhs : msl)]
+  [msl-sub (lhs : msl) (rhs : msl)]
+)
+
+;It wil take msl expression and will give us number
+;Basicly It will make calculations
+(define (eval [expr : msl])
+  (type-case msl expr
+    [msl-num (n) n]
+    [msl-add (lhs rhs) (+ (eval lhs) (eval rhs))]
+    [msl-mult (lhs rhs) (* (eval lhs) (eval rhs))]
+    [msl-sub (lhs rhs) (- (eval lhs) (eval rhs))]
+     ))
+
+; Test cases of expressions to check if they are true
+(test (eval (msl-num 4))  4)
+(test (eval (msl-add (msl-num 3) (msl-num 4)))  7)
+(test (eval (msl-num 10))  9)
+(test (eval (msl-sub (msl-num 5) (msl-num 2)))  3)
+(test (eval (msl-add (msl-add (msl-num 5) (msl-num 4)) (msl-num 35)))  55)
+(test (eval (msl-mult (msl-add (msl-num 3) (msl-num 4)) (msl-num 5)))  60)
+
+;It will takes s-expression and turn it to the msl 
+
+
+(define (parse [s : s-expression]) : msl
+  (cond
+    [(s-exp-number? s) (msl-num (s-exp->number s))]
+    [(s-exp-list? s)
+     (let ([sl (s-exp->list s)])
+       (case (s-exp->symbol (first sl))
+         [(+) (msl-add (parse (second sl)) (parse (third sl)))]
+         [(*) (msl-mult (parse (second sl)) (parse (third sl)))]
+         [(-) (msl-sub (parse (second sl)) (parse (third sl)))]
+         [else (error 'parse "invalid list input")]))]
+    [else (error 'parse "invalid input")]))
+
+; Test cases for paring
+(test (parse '7) (msl-num 7))
+(test (parse '2) (msl-num 2))
+(test (parse '(+ 3 4)) (msl-add (msl-num 3) (msl-num 4)))
+(test (parse '(* 2 8)) (msl-mult (msl-num 2) (msl-num 8)))
+(test (parse '(+ (+ 3 4) 35)) (msl-add (msl-add (msl-num 3) (msl-num 4)) (msl-num 35)))
+(test (parse '(+ (- 3 4) 35)) (msl-add (msl-sub (msl-num 3) (msl-num 1)) (msl-num 35)))
+
+; SUGAR LANGUAGE
+
+
+(define-type sln
+  [num-sln (n : number)]
+  [plus-sln (l : sln) (r : sln)]
+  [mult-sln (l : sln) (r : sln)]
+  [bmin-sln (l : sln) (r : sln)] ;;can be expressed with plus and mult
+  [umin-sln (r : sln)])                      ;;can be expressed with plus and mult
+
+;Desugar method
+  
+  (define (desugar [sugar : sln]) : msl
+  (type-case sln sugar
+    [num-sln (n) (msl-num n)]
+    [plus-sln (l r) (msl-add
+                      (desugar l)
+                      (desugar r))]
+    [mult-sln (l r) (msl-add
+                      (desugar l)
+                      (desugar r))]
+    [bmin-sln (l r) (msl-add       ;translates binary minus to addition of the neg of the second argument
+                      (desugar l)
+                      (msl-add
+                       (msl-num -1)
+                       (desugar r)))]
+    [umin-sln (v) (desugar (bmin-sln (num-sln 0) v))])) ;unary minus translates to subtracting the argument from 0
+
+    ;Test cases for desugar
+    
+(test (desugar (num-sln 9)) (msl-num 9))
+(test (desugar (plus-sln (num-sln 7) (umin-sln (num-sln 5))))
+      (msl-add (msl-num 7) (msl-add (msl-num 0) (msl-mult (msl-num -1) (msl-num 5)))))
+
